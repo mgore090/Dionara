@@ -6,14 +6,23 @@ import {
   Copy,
   Printer,
   ShoppingBag,
-  Check
+  Check,
+  FileSpreadsheet,
+  ExternalLink
 } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 
 function OrderSuccess() {
   const [searchParams] = useSearchParams();
   const urlOrderId = searchParams.get("orderId");
-  const { whatsappNumber, formatWhatsAppOrderMessage, showToast } = useShop();
+  const {
+    whatsappNumber,
+    formatWhatsAppOrderMessage,
+    showToast,
+    googleSheetUrl,
+    openGoogleSheet,
+    copyOrdersForGoogleSheet
+  } = useShop();
 
   const [order] = useState(() => {
     try {
@@ -99,6 +108,35 @@ function OrderSuccess() {
               <button className="btn-copy-wa" onClick={handleCopyDetails}>
                 {copied ? <Check size={18} /> : <Copy size={18} />}
                 <span>{copied ? "Copied!" : "Copy Order Text"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Google Sheet Order Log Callout */}
+          <div className="sheet-sync-success-callout">
+            <div className="sheet-sync-success-left">
+              <div className="sheet-icon-mini-circle">
+                <FileSpreadsheet size={20} />
+              </div>
+              <div>
+                <h4>Logged Automatically to Connected Excel / Google Sheet</h4>
+                <p>
+                  Order #{orderId} details and customer information were recorded in your official Dionara dispatch tracker.
+                </p>
+              </div>
+            </div>
+            <div className="sheet-callout-actions">
+              <button className="btn-open-sheet-receipt" onClick={openGoogleSheet}>
+                <ExternalLink size={14} />
+                <span>Open Google Sheet</span>
+              </button>
+              <button
+                className="btn-copy-sheet-row"
+                onClick={() => copyOrdersForGoogleSheet(orderId)}
+                title="Copy this order row to clipboard"
+              >
+                <Copy size={14} />
+                <span>Copy Sheet Row</span>
               </button>
             </div>
           </div>

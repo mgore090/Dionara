@@ -7,7 +7,9 @@ import {
   DEFAULT_DELIVERY_PARTNER,
   DEFAULT_ADMIN_PASSWORD,
   DEFAULT_COUPONS,
-  DEFAULT_GOOGLE_SHEET_URL
+  DEFAULT_GOOGLE_SHEET_URL,
+  DEFAULT_GOOGLE_SHEET_WEBHOOK_URL,
+  GOOGLE_APPS_SCRIPT_CODE
 } from "../constants/shop";
 import { products as initialProducts } from "../data/products";
 
@@ -175,6 +177,16 @@ export function ShopProvider({ children }) {
       return saved || DEFAULT_GOOGLE_SHEET_URL;
     } catch {
       return DEFAULT_GOOGLE_SHEET_URL;
+    }
+  });
+
+  // Connected Google Sheet Webhook / Apps Script Web App URL for automated background order sync
+  const [googleSheetWebhookUrl, setGoogleSheetWebhookUrl] = useState(() => {
+    try {
+      const saved = localStorage.getItem("dionara_google_sheet_webhook_url");
+      return saved || DEFAULT_GOOGLE_SHEET_WEBHOOK_URL;
+    } catch {
+      return DEFAULT_GOOGLE_SHEET_WEBHOOK_URL;
     }
   });
 
@@ -646,6 +658,145 @@ export function ShopProvider({ children }) {
     window.open(googleSheetUrl, "_blank");
   };
 
+  // Update Connected Google Sheet Webhook / Script URL
+  const updateGoogleSheetWebhookUrl = (url) => {
+    const cleaned = url.trim();
+    setGoogleSheetWebhookUrl(cleaned);
+    localStorage.setItem("dionara_google_sheet_webhook_url", cleaned);
+    showToast("Google Sheet Webhook URL saved!", "success");
+  };
+
+  // Send an individual order automatically to Google Sheet
+  const sendOrderToGoogleSheet = async (orderData) => {
+    const webhookUrl = (googleSheetWebhookUrl || DEFAULT_GOOGLE_SHEET_WEBHOOK_URL).trim();
+
+    const itemsSummary = (orderData.items || [])
+      .map((i) => `${i.name} (Qty: ${i.quantity}, ₹${i.price})`)
+      .join("; ");
+    const totalQty = (orderData.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
+
+    const payload = {
+      orderId: orderData.orderId,
+      orderDate: orderData.createdAt
+        ? new Date(orderData.createdAt).toLocaleString("en-IN")
+        : new Date().toLocaleString("en-IN"),
+      customerName: orderData.customer?.name || "",
+      mobile: orderData.customer?.mobile || "",
+      email: orderData.customer?.email || "",
+      address: orderData.customer?.address || "",
+      landmark: orderData.customer?.landmark || "",
+      city: orderData.customer?.city || "",
+      state: orderData.customer?.state || "",
+      pincode: orderData.customer?.pincode || "",
+      notes: orderData.customer?.notes || "",
+      paymentMethod: orderData.customer?.paymentMethod || "UPI / WhatsApp Pay",
+      items: itemsSummary,
+      totalQty: totalQty,
+      subtotal: orderData.totals?.subtotal || 0,
+      discount: orderData.totals?.discount || 0,
+      shipping: orderData.totals?.shipping || 0,
+      total: orderData.totals?.total || 0,
+      status: orderData.status || "Pending Confirmation",
+      trackingId: orderData.trackingId || "Pending",
+      deliveryPartner: deliveryPartner?.name || "Shiprocket",
+      deliveryPartnerUrl: deliveryPartner?.url || DEFAULT_DELIVERY_PARTNER.url
+    };
+
+    if (!webhookUrl) {
+      console.info("Google Sheet Webhook URL not configured yet. Order saved in Dionara dashboard.");
+      return { success: false, reason: "No webhook URL" };
+    }
+
+    try {
+      // POST with mode: 'no-cors' avoids browser CORS preflight blocking with Google Apps Script
+      await fetch(webhookUrl, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(payload)
+      });
+      return { success: true };
+    } catch (error) {
+      console.warn("Could not post to Google Sheet script:", error);
+      return { success: false, error };
+    }
+  };
+
+  // Send a test row to verify Google Sheet Webhook connection
+  const sendTestOrderToGoogleSheet = async () => {
+    const webhookUrl = (googleSheetWebhookUrl || DEFAULT_GOOGLE_SHEET_WEBHOOK_URL).trim();
+    if (!webhookUrl) {
+      showToast("Please enter and save your Google Apps Script Web App URL first", "error");
+      return false;
+    }
+
+    const testOrder = {
+      orderId: `DIO-TEST-${Math.floor(1000 + Math.random() * 9000)}`,
+      createdAt: new Date().toISOString(),
+      customer: {
+        name: "Test Customer (Dionara System Test)",
+        mobile: "917058805659",
+        email: "test@dionara.com",
+        address: "Shop 101, Dionara Care Suite",
+        landmark: "Near Dionara Labs",
+        city: "Mumbai",
+        state: "Maharashtra",
+        pincode: "400001",
+        notes: "Automated test order from Dionara Admin",
+        paymentMethod: "UPI / WhatsApp Pay"
+      },
+      items: [
+        {
+          id: 1,
+          name: "Dionara Invisible Water-Glow Sunscreen SPF 50+ PA++++",
+          price: 599,
+          quantity: 1
+        }
+      ],
+      totals: {
+        subtotal: 599,
+        discount: 0,
+        shipping: 0,
+        total: 599
+      },
+      status: "Verified Test Row"
+    };
+
+    showToast("Sending test row to Google Sheet...", "info");
+    const res = await sendOrderToGoogleSheet(testOrder);
+    if (res.success) {
+      showToast("Test order sent! Check your Google Sheet to verify the new row.", "success");
+      return true;
+    } else {
+      showToast("Failed to send test row. Please check the Webhook URL.", "error");
+      return false;
+    }
+  };
+
+  // Sync all store orders to the Google Sheet in batch
+  const syncAllOrdersToGoogleSheet = async () => {
+    const webhookUrl = (googleSheetWebhookUrl || DEFAULT_GOOGLE_SHEET_WEBHOOK_URL).trim();
+    if (!webhookUrl) {
+      showToast("Please configure the Google Apps Script Web App URL first", "error");
+      return;
+    }
+
+    if (!orders || orders.length === 0) {
+      showToast("No orders available to sync", "error");
+      return;
+    }
+
+    showToast(`Syncing ${orders.length} order(s) to Google Sheet...`, "info");
+    let count = 0;
+    for (const ord of orders) {
+      await sendOrderToGoogleSheet(ord);
+      count++;
+    }
+    showToast(`Successfully pushed ${count} order(s) to Google Sheet!`, "success");
+  };
+
   // Copy Orders formatted for 1-Click Paste into Google Sheet (TSV format)
   const copyOrdersForGoogleSheet = (orderId = null) => {
     const targetOrders = orderId
@@ -774,6 +925,12 @@ export function ShopProvider({ children }) {
         exportOrdersToCSV,
         googleSheetUrl,
         updateGoogleSheetUrl,
+        googleSheetWebhookUrl,
+        updateGoogleSheetWebhookUrl,
+        sendOrderToGoogleSheet,
+        sendTestOrderToGoogleSheet,
+        syncAllOrdersToGoogleSheet,
+        GOOGLE_APPS_SCRIPT_CODE,
         openGoogleSheet,
         copyOrdersForGoogleSheet,
         toast,

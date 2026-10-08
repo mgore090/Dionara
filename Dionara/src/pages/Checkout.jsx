@@ -23,6 +23,7 @@ function Checkout() {
     formatWhatsAppOrderMessage,
     clearCart,
     addOrder,
+    sendOrderToGoogleSheet,
     showToast
   } = useShop();
 
@@ -64,7 +65,7 @@ function Checkout() {
     }));
   };
 
-  const handlePlaceOrder = (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
 
     // Basic validation
@@ -90,7 +91,7 @@ function Checkout() {
       createdAt: new Date().toISOString()
     };
 
-    // Save order in localStorage for confirmation receipt and all orders list
+    // 1. Save order in localStorage for confirmation receipt and all orders list
     try {
       localStorage.setItem("dionara_last_order", JSON.stringify(orderData));
       addOrder(orderData);
@@ -98,7 +99,14 @@ function Checkout() {
       // storage quota fallback
     }
 
-    // Format WhatsApp message
+    // 2. Automatically log order details to connected Google Sheet (Excel)
+    try {
+      await sendOrderToGoogleSheet(orderData);
+    } catch (err) {
+      console.warn("Background Google Sheet auto-sync notification:", err);
+    }
+
+    // 3. Format WhatsApp message
     const message = formatWhatsAppOrderMessage({
       customer,
       orderId,
@@ -113,7 +121,7 @@ function Checkout() {
 
     // Clear cart and navigate to order success receipt
     clearCart();
-    showToast("Order prepared! Opening WhatsApp...", "success");
+    showToast("Order submitted to WhatsApp & logged to Excel!", "success");
 
     setTimeout(() => {
       navigate(`/order-success?orderId=${orderId}`);
@@ -296,7 +304,7 @@ function Checkout() {
                   </div>
                 </div>
 
-                {/* WhatsApp Order Action Button */}
+                {/* WhatsApp & Google Sheets Order Action Button */}
                 <div className="checkout-submit-wrap">
                   <button
                     type="submit"
@@ -305,11 +313,11 @@ function Checkout() {
                   >
                     <MessageCircle size={22} />
                     <span>
-                      {isSubmitting ? "Submitting Order..." : `SUBMIT ORDER TO WHATSAPP (+${whatsappNumber})`}
+                      {isSubmitting ? "Submitting to WhatsApp & Excel..." : `SUBMIT ORDER TO WHATSAPP (+${whatsappNumber})`}
                     </span>
                   </button>
                   <p className="whatsapp-help-note">
-                    ✅ All filled address details & cart products will be sent directly to <strong>+{whatsappNumber}</strong> on WhatsApp for instant confirmation.
+                    ✅ All filled address details & cart products will be sent directly to <strong>+{whatsappNumber}</strong> on WhatsApp and recorded automatically in your Google Sheet (Excel).
                   </p>
                 </div>
               </form>

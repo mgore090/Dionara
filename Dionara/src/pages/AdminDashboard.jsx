@@ -19,7 +19,10 @@ import {
   ShieldAlert,
   Package,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Code,
+  RefreshCw
 } from "lucide-react";
 import { useShop } from "../context/ShopContext";
 import AdminProductEditModal from "../components/AdminProductEditModal";
@@ -37,6 +40,12 @@ function AdminDashboard() {
     whatsappNumber,
     googleSheetUrl,
     updateGoogleSheetUrl,
+    googleSheetWebhookUrl,
+    updateGoogleSheetWebhookUrl,
+    sendTestOrderToGoogleSheet,
+    syncAllOrdersToGoogleSheet,
+    sendOrderToGoogleSheet,
+    GOOGLE_APPS_SCRIPT_CODE,
     openGoogleSheet,
     copyOrdersForGoogleSheet,
     updateDeliveryPartner,
@@ -62,6 +71,11 @@ function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [copiedId, setCopiedId] = useState(null);
   const [tempSheetUrl, setTempSheetUrl] = useState(googleSheetUrl);
+  const [tempWebhookUrl, setTempWebhookUrl] = useState(googleSheetWebhookUrl || "");
+  const [showScriptModal, setShowScriptModal] = useState(false);
+  const [scriptCopied, setScriptCopied] = useState(false);
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
 
   // Delivery Partner Settings Modal State
   const [partnerModalOpen, setPartnerModalOpen] = useState(false);
@@ -209,6 +223,31 @@ function AdminDashboard() {
     }
   };
 
+  // Google Sheet Webhook Sync Handlers
+  const handleSaveWebhookUrl = (e) => {
+    e.preventDefault();
+    updateGoogleSheetWebhookUrl(tempWebhookUrl);
+  };
+
+  const handleCopyAppsScript = () => {
+    navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+    setScriptCopied(true);
+    showToast("Google Apps Script code copied to clipboard!", "success");
+    setTimeout(() => setScriptCopied(false), 3000);
+  };
+
+  const handleRunTestOrder = async () => {
+    setIsTestingWebhook(true);
+    await sendTestOrderToGoogleSheet();
+    setIsTestingWebhook(false);
+  };
+
+  const handleRunSyncAll = async () => {
+    setIsSyncingAll(true);
+    await syncAllOrdersToGoogleSheet();
+    setIsSyncingAll(false);
+  };
+
   return (
     <div className="admin-dashboard-page">
       {/* Admin Top Header Banner */}
@@ -353,6 +392,83 @@ function AdminDashboard() {
                   <span>Download .CSV</span>
                 </button>
               </div>
+            </div>
+
+            {/* Automatic Google Sheets Real-Time Sync Sub-card */}
+            <div className="sheet-webhook-config-box">
+              <div className="webhook-box-header">
+                <div className="webhook-title-left">
+                  <div className="webhook-icon-badge">
+                    <Zap size={20} />
+                  </div>
+                  <div>
+                    <div className="webhook-badge-row">
+                      <h4>Automated Real-Time Order Sync to Google Sheet</h4>
+                      {googleSheetWebhookUrl ? (
+                        <span className="badge-sync-on">
+                          <span className="pulse-mini-dot"></span> LIVE WEBHOOK ACTIVE
+                        </span>
+                      ) : (
+                        <span className="badge-sync-off">
+                          SETUP WEBHOOK (1 MINUTE)
+                        </span>
+                      )}
+                    </div>
+                    <p>
+                      Orders submitted by customers on the store automatically log all 22 details directly into your Google Sheet in real time.
+                    </p>
+                  </div>
+                </div>
+                <div className="webhook-actions-right">
+                  <button
+                    type="button"
+                    className="btn-script-guide-toggle"
+                    onClick={() => setShowScriptModal(true)}
+                  >
+                    <Code size={14} />
+                    <span>Setup Guide & Script</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-trigger-test-order"
+                    onClick={handleRunTestOrder}
+                    disabled={isTestingWebhook}
+                  >
+                    <Zap size={14} />
+                    <span>{isTestingWebhook ? "Sending..." : "Send Test Row"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-trigger-sync-all"
+                    onClick={handleRunSyncAll}
+                    disabled={isSyncingAll}
+                  >
+                    <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
+                    <span>{isSyncingAll ? "Syncing..." : "Sync All Orders"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Webhook URL Input Form */}
+              <form onSubmit={handleSaveWebhookUrl} className="webhook-input-form">
+                <div className="webhook-input-wrap">
+                  <label>Google Apps Script Web App URL:</label>
+                  <div className="input-with-button">
+                    <input
+                      type="url"
+                      placeholder="e.g. https://script.google.com/macros/s/AKfycb.../exec"
+                      value={tempWebhookUrl}
+                      onChange={(e) => setTempWebhookUrl(e.target.value)}
+                    />
+                    <button type="submit" className="btn-save-webhook">
+                      Save Webhook URL
+                    </button>
+                  </div>
+                </div>
+                <div className="webhook-quick-tips">
+                  <span>💡 <strong>How it works:</strong> Click <em>'Setup Guide & Script'</em> above, paste the 20-line script into your Google Sheet, and paste your Web App URL here. Dionara will post every checkout order automatically!</span>
+                </div>
+              </form>
             </div>
 
             {/* KPI Stats Cards */}
@@ -647,6 +763,23 @@ function AdminDashboard() {
                             >
                               <Copy size={12} />
                               <span>Copy for Google Sheet</span>
+                            </button>
+
+                            {/* Push single row to Google Sheet automatically via webhook */}
+                            <button
+                              className="btn-sheet-push-row"
+                              onClick={async () => {
+                                const res = await sendOrderToGoogleSheet(ord);
+                                if (res.success) {
+                                  showToast(`Order #${ord.orderId} pushed to Google Sheet!`, "success");
+                                } else {
+                                  showToast("Configured Webhook URL needed to sync live to Sheet", "info");
+                                }
+                              }}
+                              title="Push this individual order to Google Sheet"
+                            >
+                              <Zap size={12} />
+                              <span>Auto-Push to Sheet</span>
                             </button>
                           </div>
                         </td>
@@ -1278,6 +1411,104 @@ function AdminDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Google Apps Script Setup & Automation Guide Modal */}
+      {showScriptModal && (
+        <div className="admin-modal-backdrop" onClick={() => setShowScriptModal(false)}>
+          <div className="admin-modal-window modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="admin-modal-header">
+              <div className="modal-header-left">
+                <span className="admin-badge-pill">LIVE GOOGLE SHEETS SETUP</span>
+                <h3>Automated Google Sheet Receiver Setup</h3>
+              </div>
+              <button className="btn-modal-close" onClick={() => setShowScriptModal(false)}>
+                &times;
+              </button>
+            </div>
+
+            <div className="apps-script-modal-content">
+              <div className="setup-target-sheet-bar">
+                <span>Target Connected Spreadsheet:</span>
+                <a
+                  href={googleSheetUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="target-sheet-link"
+                >
+                  {googleSheetUrl}
+                  <ExternalLink size={13} />
+                </a>
+              </div>
+
+              <div className="setup-steps-list">
+                <div className="setup-step-item">
+                  <div className="step-badge">1</div>
+                  <div className="step-content">
+                    <strong>Open Apps Script in Google Sheets</strong>
+                    <p>
+                      Click the link above to open your Google Sheet. In the top navigation bar, click <strong>Extensions</strong> &rarr; <strong>Apps Script</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="setup-step-item">
+                  <div className="step-badge">2</div>
+                  <div className="step-content">
+                    <strong>Paste this Script & Save</strong>
+                    <p>
+                      In the code editor, delete any existing code, paste the script below, and click the <strong>Save</strong> (💾) button.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="setup-step-item">
+                  <div className="setup-step-badge-green">3</div>
+                  <div className="step-content">
+                    <strong>Deploy as Web App</strong>
+                    <p>
+                      Click the blue <strong>Deploy</strong> button (top right) &rarr; <strong>New deployment</strong>.
+                      Select type <strong>Web app</strong>. Set <em>Execute as:</em> <strong>Me</strong> and <em>Who has access:</em> <strong>Anyone</strong>.
+                      Click <strong>Deploy</strong>, copy the generated <strong>Web app URL</strong>, and paste it into the Dionara Admin input.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Code viewer with 1-click copy */}
+              <div className="script-code-viewer">
+                <div className="viewer-header">
+                  <span>Google Apps Script (Code.gs)</span>
+                  <button className="btn-copy-code-inline" onClick={handleCopyAppsScript}>
+                    {scriptCopied ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{scriptCopied ? "Copied to Clipboard!" : "Copy Full Code"}</span>
+                  </button>
+                </div>
+                <pre className="script-code-block">
+                  <code>{GOOGLE_APPS_SCRIPT_CODE}</code>
+                </pre>
+              </div>
+
+              <div className="admin-modal-footer">
+                <button
+                  type="button"
+                  className="btn-primary-action"
+                  onClick={handleCopyAppsScript}
+                >
+                  <Copy size={15} />
+                  <span>{scriptCopied ? "Code Copied!" : "Copy Code to Clipboard"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary-action"
+                  onClick={() => setShowScriptModal(false)}
+                >
+                  Close Guide
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
