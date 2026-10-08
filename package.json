@@ -1,0 +1,10 @@
+{
+  "name": "dionara-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix Dionara run dev",
+    "build": "npm --prefix Dionara run build",
+    "lint": "npm --prefix Dionara run lint",
+    "preview": "npm --prefix Dionara run preview"
+  }
+}

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ShopProvider } from "./context/ShopContext";
 
 // Components
@@ -29,7 +29,7 @@ import "./App.css";
 function App() {
   return (
     <ShopProvider>
-      <BrowserRouter>
+      <HashRouter>
         <ScrollToTop />
         <div className="app-shell">
           <AdminBar />
@@ -57,7 +57,7 @@ function App() {
           <WhatsAppFloating />
           <ToastNotification />
         </div>
-      </BrowserRouter>
+      </HashRouter>
     </ShopProvider>
   );
 }
