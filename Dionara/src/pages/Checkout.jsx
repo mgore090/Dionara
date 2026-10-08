@@ -121,7 +121,7 @@ function Checkout() {
 
     // Clear cart and navigate to order success receipt
     clearCart();
-    showToast("Order submitted to WhatsApp & logged to Excel!", "success");
+    showToast("Order prepared! Opening WhatsApp...", "success");
 
     setTimeout(() => {
       navigate(`/order-success?orderId=${orderId}`);
@@ -304,7 +304,7 @@ function Checkout() {
                   </div>
                 </div>
 
-                {/* WhatsApp & Google Sheets Order Action Button */}
+                {/* WhatsApp Order Action Button */}
                 <div className="checkout-submit-wrap">
                   <button
                     type="submit"
@@ -313,11 +313,11 @@ function Checkout() {
                   >
                     <MessageCircle size={22} />
                     <span>
-                      {isSubmitting ? "Submitting to WhatsApp & Excel..." : `SUBMIT ORDER TO WHATSAPP (+${whatsappNumber})`}
+                      {isSubmitting ? "Submitting Order..." : `SUBMIT ORDER TO WHATSAPP (+${whatsappNumber})`}
                     </span>
                   </button>
                   <p className="whatsapp-help-note">
-                    ✅ All filled address details & cart products will be sent directly to <strong>+{whatsappNumber}</strong> on WhatsApp and recorded automatically in your Google Sheet (Excel).
+                    ✅ All filled address details & cart products will be sent directly to <strong>+{whatsappNumber}</strong> on WhatsApp for instant confirmation.
                   </p>
                 </div>
               </form>

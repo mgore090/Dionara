@@ -112,35 +112,6 @@ function OrderSuccess() {
             </div>
           </div>
 
-          {/* Google Sheet Order Log Callout */}
-          <div className="sheet-sync-success-callout">
-            <div className="sheet-sync-success-left">
-              <div className="sheet-icon-mini-circle">
-                <FileSpreadsheet size={20} />
-              </div>
-              <div>
-                <h4>Logged Automatically to Connected Excel / Google Sheet</h4>
-                <p>
-                  Order #{orderId} details and customer information were recorded in your official Dionara dispatch tracker.
-                </p>
-              </div>
-            </div>
-            <div className="sheet-callout-actions">
-              <button className="btn-open-sheet-receipt" onClick={openGoogleSheet}>
-                <ExternalLink size={14} />
-                <span>Open Google Sheet</span>
-              </button>
-              <button
-                className="btn-copy-sheet-row"
-                onClick={() => copyOrdersForGoogleSheet(orderId)}
-                title="Copy this order row to clipboard"
-              >
-                <Copy size={14} />
-                <span>Copy Sheet Row</span>
-              </button>
-            </div>
-          </div>
-
           {/* What happens next */}
           <div className="next-steps-container">
             <h3>What Happens Next?</h3>
